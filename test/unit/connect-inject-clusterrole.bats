@@ -4,17 +4,15 @@ load _helpers
 
 @test "connectInject/ClusterRole: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      .
 }
 
 @test "connectInject/ClusterRole: enabled with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -25,29 +23,25 @@ load _helpers
 
 @test "connectInject/ClusterRole: disabled with connectInject.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInject/ClusterRole: disabled with connectInject.certs.secretName set" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.certs.secretName=foo' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInject/ClusterRole: enabled with connectInject.certs.secretName not set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -60,7 +54,7 @@ load _helpers
 @test "connectInject/ClusterRole: no podsecuritypolicies access with global.enablePodSecurityPolicies=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=false' \
       . | tee /dev/stderr |
@@ -71,7 +65,7 @@ load _helpers
 @test "connectInject/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
@@ -80,14 +74,14 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs for namespaces
+# global.acls.manageSystemACLs for namespaces
 
 @test "connectInject/ClusterRole: does not allow secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
@@ -96,9 +90,9 @@ load _helpers
 @test "connectInject/ClusterRole: allow secret access with global.bootsrapACLs=true and global.enableConsulNamespaces=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1].resources[0]' | tee /dev/stderr)
@@ -108,9 +102,9 @@ load _helpers
 @test "connectInject/ClusterRole: allows secret access with bootsrapACLs, enablePodSecurityPolicies and enableConsulNamespaces all true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-clusterrole.yaml  \
+      -s templates/connect-inject-clusterrole.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |

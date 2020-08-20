@@ -4,49 +4,41 @@ load _helpers
 
 @test "server/EnterpriseLicense: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/enterprise-license-job.yaml  \
+      .
 }
 
 @test "server/EnterpriseLicense: disabled when servers are disabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "server/EnterpriseLicense: disabled when secretName is missing" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "server/EnterpriseLicense: disabled when secretKey is missing" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "server/EnterpriseLicense: enabled when secretName and secretKey is provided" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -55,27 +47,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.bootstrapACLs=true" {
+@test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml \
+      -s templates/enterprise-license-job.yaml \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "server/EnterpriseLicense: init container is created when global.bootstrapACLs=true" {
+@test "server/EnterpriseLicense: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 
@@ -94,7 +86,7 @@ load _helpers
 @test "server/EnterpriseLicense: no volumes when TLS is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=false' \
@@ -106,7 +98,7 @@ load _helpers
 @test "server/EnterpriseLicense: volumes present when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=true' \
@@ -118,7 +110,7 @@ load _helpers
 @test "server/EnterpriseLicense: no volumes mounted when TLS is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=false' \
@@ -130,7 +122,7 @@ load _helpers
 @test "server/EnterpriseLicense: volumes mounted when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=true' \
@@ -142,7 +134,7 @@ load _helpers
 @test "server/EnterpriseLicense: URL is http when TLS is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=false' \
@@ -154,7 +146,7 @@ load _helpers
 @test "server/EnterpriseLicense: URL is https when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=true' \
@@ -166,7 +158,7 @@ load _helpers
 @test "server/EnterpriseLicense: CA certificate is specified when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=true' \
@@ -178,8 +170,7 @@ load _helpers
 @test "server/EnterpriseLicense: can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
-      -x templates/enterprise-license-job.yaml  \
+      -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.tls.enabled=true' \

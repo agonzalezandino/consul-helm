@@ -1,5 +1,7 @@
-# StatefulSet to run the actual Consul server cluster.
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if and .Values.global.federation.enabled (not .Values.global.tls.enabled) }}{{ fail "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" }}{{ end }}
+{{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
+# StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -36,8 +38,12 @@ spec:
         release: {{ .Release.Name }}
         component: server
         hasDNS: "true"
+        {{- if .Values.server.extraLabels }}
+          {{- toYaml .Values.server.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ .Values.server.extraConfig | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
@@ -52,8 +58,10 @@ spec:
     {{- end }}
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
+      {{- if not .Values.server.disableFsGroupSecurityContext }}
       securityContext:
         fsGroup: 1000
+      {{- end }}
       volumes:
         - name: config
           configMap:
@@ -69,7 +77,7 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
-        - name: tls-server-cert
+        - name: consul-server-cert
           secret:
             secretName: {{ template "consul.fullname" . }}-server-cert
         {{- end }}
@@ -80,6 +88,13 @@ spec:
             name: {{ .name }}
             {{- else if (eq .type "secret") }}
             secretName: {{ .name }}
+            {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
             {{- end }}
         {{- end }}
       {{- if .Values.server.priorityClassName }}
@@ -110,6 +125,13 @@ spec:
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
+            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+            - name: ACL_REPLICATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.replicationToken.secretName | quote }}
+                  key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
@@ -125,6 +147,9 @@ spec:
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 -hcl='cert_file = "/consul/tls/server/tls.crt"' \
                 -hcl='key_file = "/consul/tls/server/tls.key"' \
+                {{- if .Values.global.tls.enableAutoEncrypt }}
+                -hcl='auto_encrypt = {allow_tls = true}' \
+                {{- end }}
                 {{- if .Values.global.tls.verify }}
                 -hcl='verify_incoming_rpc = true' \
                 -hcl='verify_outgoing = true' \
@@ -137,6 +162,9 @@ spec:
                 {{- end }}
                 -client=0.0.0.0 \
                 -config-dir=/consul/config \
+                {{- /* Always include the extraVolumes at the end so that users can
+                    override other Consul settings. The last -config-dir takes
+                    precedence. */}}
                 {{- range .Values.server.extraVolumes }}
                 {{- if .load }}
                 -config-dir=/consul/userconfig/{{ .name }} \
@@ -150,6 +178,12 @@ spec:
                 {{- end }}
                 {{- if .Values.server.connect }}
                 -hcl="connect { enabled = true }" \
+                {{- end }}
+                {{- if .Values.global.federation.enabled }}
+                -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
+                {{- end }}
+                {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
                 {{- if .Values.ui.enabled }}
                 -ui \
@@ -167,7 +201,7 @@ spec:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca/
               readOnly: true
-            - name: tls-server-cert
+            - name: consul-server-cert
               mountPath: /consul/tls/server
               readOnly: true
             {{- end }}
@@ -227,7 +261,11 @@ spec:
             timeoutSeconds: 5
           {{- if .Values.server.resources }}
           resources:
+            {{- if eq (typeOf .Values.server.resources) "string" }}
             {{ tpl .Values.server.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.server.resources | nindent 12 }}
+            {{- end }}
           {{- end }}
       {{- if .Values.server.nodeSelector }}
       nodeSelector:
